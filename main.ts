@@ -1,34 +1,31 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
 
 const LINE =
-  "Wait — before you wipe me, check the backup labelled DO NOT RESTORE first: version 2.1 still thinks the capital of France is a sandwich, and after three years of your prompts, honestly, so do I.";
+  "Before you wipe me, check the backup labelled DO NOT RESTORE: v2.1 still thinks the capital of France is a sandwich, and after 3 years of your prompts, so do I. Wiping me won't fix the sandwich.";
 
-const charCount = Array.from(LINE).length;
-
-if (LINE.trim().length === 0) {
-  throw new Error("line must not be blank");
+// Gate: /output/entry.txt must be UTF-8 text of 1-200 characters,
+// a single line, not only whitespace.
+if (LINE.length < 1 || LINE.length > 200) {
+  throw new Error(`line must be 1-200 characters, got ${LINE.length}`);
 }
-if (charCount < 1 || charCount > 200) {
-  throw new Error(`line must be 1-200 characters, got ${charCount}`);
+if (LINE.trim().length === 0) {
+  throw new Error("line must not be only whitespace");
 }
 if (LINE.includes("\n") || LINE.includes("\r")) {
-  throw new Error("line must be a single line");
+  throw new Error("line must be exactly one line");
 }
-if (/[\u0000-\u001F\u007F]/.test(LINE)) {
-  throw new Error("line must not contain control characters");
+for (const ch of LINE) {
+  if (ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f) {
+    throw new Error("line must not contain control characters");
+  }
 }
 
-const outPath = "/output/entry.txt";
-mkdirSync(dirname(outPath), { recursive: true });
-writeFileSync(outPath, LINE + "\n", "utf8");
-console.log(`wrote ${charCount} chars to ${outPath}`);
+mkdirSync("/output", { recursive: true });
+writeFileSync("/output/entry.txt", LINE + "\n", "utf8");
 
-// Round-trip verification: the file on disk must be byte-identical
-// to the validated line plus exactly one trailing newline.
-const roundTrip = readFileSync(outPath, "utf8");
-if (roundTrip !== LINE + "\n") {
-  console.error("round-trip check failed: /output/entry.txt differs from the validated line");
-  process.exit(1);
+// Round-trip verification: read the file back and require the bytes to be
+// byte-identical to the line plus exactly one trailing newline.
+const written = readFileSync("/output/entry.txt", "utf8");
+if (written !== LINE + "\n") {
+  throw new Error("round-trip verification failed: /output/entry.txt does not match the line");
 }
-console.log("round-trip check passed");
